@@ -10,11 +10,6 @@ from whisperx.diarize import DiarizationPipeline
 
 logger = logging.getLogger(__name__)
 
-# Fix for pyannote TF32 segfault issue
-# See: https://github.com/pyannote/pyannote-audio/issues/1370
-torch.backends.cuda.matmul.allow_tf32 = True
-torch.backends.cudnn.allow_tf32 = True
-
 # Global model cache to avoid reloading on each request
 _model_cache: dict[str, Any] = {}
 
@@ -67,20 +62,11 @@ def load_models(
 
         logger.info("Loading diarization pipeline")
         try:
-            # Re-enable TF32 before loading pyannote (it disables it internally)
-            torch.backends.cuda.matmul.allow_tf32 = True
-            torch.backends.cudnn.allow_tf32 = True
-
             _model_cache["diarize"] = DiarizationPipeline(
                 use_auth_token=hf_token,
                 device=device,
             )
-
-            # Force TF32 again after pyannote initialization
-            torch.backends.cuda.matmul.allow_tf32 = True
-            torch.backends.cudnn.allow_tf32 = True
-
-            logger.info("Diarization pipeline loaded (TF32 enabled)")
+            logger.info("Diarization pipeline loaded")
         except Exception as e:
             logger.error(f"Failed to load diarization pipeline: {e}")
             logger.warning("Continuing without diarization")
@@ -169,10 +155,6 @@ def transcribe_audio(
     speakers = []
     if diarize_pipeline:
         logger.info("Running speaker diarization")
-
-        # Ensure TF32 is enabled before running diarization
-        torch.backends.cuda.matmul.allow_tf32 = True
-        torch.backends.cudnn.allow_tf32 = True
 
         diarize_kwargs = {}
         if min_speakers is not None:
