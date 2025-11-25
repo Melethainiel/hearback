@@ -15,10 +15,6 @@ COPY requirements.txt .
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Fix cuDNN 9.x incompatibility - force install cuDNN 8.x
-RUN pip uninstall -y nvidia-cudnn-cu12 || true
-RUN pip install --no-cache-dir nvidia-cudnn-cu12==8.9.7.29
-
 # Copy source code
 COPY src/ ./
 
