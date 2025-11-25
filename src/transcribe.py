@@ -10,6 +10,11 @@ from whisperx.diarize import DiarizationPipeline
 
 logger = logging.getLogger(__name__)
 
+# Fix for pyannote TF32 segfault issue
+# See: https://github.com/pyannote/pyannote-audio/issues/1370
+torch.backends.cuda.matmul.allow_tf32 = True
+torch.backends.cudnn.allow_tf32 = True
+
 # Global model cache to avoid reloading on each request
 _model_cache: dict[str, Any] = {}
 
