@@ -114,7 +114,7 @@ def transcribe_audio(
     load_models(device, compute_type)
 
     whisper_model = _model_cache["whisper"]
-    diarize_pipeline = _model_cache["diarize"]
+    diarize_pipeline = _model_cache.get("diarize")
 
     # Load audio
     logger.info(f"Loading audio from {audio_path}")
