@@ -6,40 +6,28 @@ import sys
 import time
 from typing import Any
 
-# Fix cuDNN 9.x incompatibility by forcing cuDNN 8.x from pip
+# Fix cuDNN library path issue
 # See: https://github.com/m-bain/whisperX/issues/902#issuecomment-2433187969
 # Allow override via CUDNN_PATH env var
 cudnn_path = os.environ.get("CUDNN_PATH")
 
 if not cudnn_path:
-    try:
-        import nvidia.cudnn
+    # Try multiple detection methods
+    import site
 
-        # Try to find cudnn lib path - nvidia.cudnn.__file__ can be None
-        if hasattr(nvidia.cudnn, "__file__") and nvidia.cudnn.__file__:
-            cudnn_path = os.path.join(os.path.dirname(nvidia.cudnn.__file__), "lib")
-        else:
-            # Fallback: search in site-packages
-            import site
-
-            for site_pkg in site.getsitepackages():
-                potential_path = os.path.join(site_pkg, "nvidia", "cudnn", "lib")
-                if os.path.exists(potential_path):
-                    cudnn_path = potential_path
-                    break
-    except (ImportError, AttributeError, TypeError) as e:
-        logging.basicConfig(level=logging.INFO)
-        logging.warning(f"Could not auto-detect cuDNN path: {e}")
+    for site_pkg in site.getsitepackages():
+        potential_path = os.path.join(site_pkg, "nvidia", "cudnn", "lib")
+        if os.path.exists(potential_path):
+            cudnn_path = potential_path
+            break
 
 if cudnn_path and os.path.exists(cudnn_path):
-    os.environ["LD_LIBRARY_PATH"] = (
-        f"{cudnn_path}:{os.environ.get('LD_LIBRARY_PATH', '')}"
-    )
-    logging.basicConfig(level=logging.INFO)
-    logging.info(f"Set LD_LIBRARY_PATH to use cuDNN from: {cudnn_path}")
+    current_ld_path = os.environ.get("LD_LIBRARY_PATH", "")
+    if cudnn_path not in current_ld_path:
+        os.environ["LD_LIBRARY_PATH"] = f"{cudnn_path}:{current_ld_path}"
+        print(f"Set LD_LIBRARY_PATH to use cuDNN from: {cudnn_path}")
 else:
-    logging.basicConfig(level=logging.INFO)
-    logging.warning("cuDNN path not found - may encounter libcudnn errors")
+    print("WARNING: cuDNN path not found - may encounter libcudnn errors")
 
 import runpod
 
