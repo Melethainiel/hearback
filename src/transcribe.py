@@ -34,12 +34,17 @@ def get_whisper_model_name() -> str:
     return os.environ.get("WHISPER_MODEL", "large-v3")
 
 
-def load_models(device: str | None = None, compute_type: str | None = None) -> None:
+def load_models(
+    device: str | None = None,
+    compute_type: str | None = None,
+    enable_diarization: bool = True,
+) -> None:
     """Pre-load models into cache for faster inference.
 
     Args:
         device: Device to load models on ("cuda" or "cpu").
         compute_type: Compute type for faster-whisper ("float16", "int8", etc.).
+        enable_diarization: Whether to load diarization model (default: True).
     """
     device = device or get_device()
     compute_type = compute_type or get_compute_type()
@@ -54,19 +59,22 @@ def load_models(device: str | None = None, compute_type: str | None = None) -> N
         )
         logger.info("Whisper model loaded")
 
-    if "diarize" not in _model_cache:
+    if enable_diarization and "diarize" not in _model_cache:
         hf_token = os.environ.get("HF_TOKEN")
         if not hf_token:
-            raise ValueError(
-                "HF_TOKEN environment variable is required for diarization"
-            )
+            logger.warning("HF_TOKEN not set, diarization will be disabled")
+            return
 
         logger.info("Loading diarization pipeline")
-        _model_cache["diarize"] = DiarizationPipeline(
-            use_auth_token=hf_token,
-            device=device,
-        )
-        logger.info("Diarization pipeline loaded")
+        try:
+            _model_cache["diarize"] = DiarizationPipeline(
+                use_auth_token=hf_token,
+                device=device,
+            )
+            logger.info("Diarization pipeline loaded")
+        except Exception as e:
+            logger.error(f"Failed to load diarization pipeline: {e}")
+            logger.warning("Continuing without diarization")
 
 
 def transcribe_audio(
@@ -134,27 +142,34 @@ def transcribe_audio(
     del align_model
     torch.cuda.empty_cache() if device == "cuda" else None
 
-    # Diarize
-    logger.info("Running speaker diarization")
-    diarize_kwargs = {}
-    if min_speakers is not None:
-        diarize_kwargs["min_speakers"] = min_speakers
-    if max_speakers is not None:
-        diarize_kwargs["max_speakers"] = max_speakers
+    # Diarize (if available)
+    speakers = []
+    if diarize_pipeline:
+        logger.info("Running speaker diarization")
+        diarize_kwargs = {}
+        if min_speakers is not None:
+            diarize_kwargs["min_speakers"] = min_speakers
+        if max_speakers is not None:
+            diarize_kwargs["max_speakers"] = max_speakers
 
-    diarize_segments = diarize_pipeline(audio, **diarize_kwargs)
+        try:
+            diarize_segments = diarize_pipeline(audio, **diarize_kwargs)
+            # Assign speakers to segments
+            result = whisperx.assign_word_speakers(diarize_segments, result)
 
-    # Assign speakers to segments
-    result = whisperx.assign_word_speakers(diarize_segments, result)
-
-    # Extract unique speakers
-    speakers = sorted(
-        set(
-            seg.get("speaker", "UNKNOWN")
-            for seg in result.get("segments", [])
-            if seg.get("speaker")
-        )
-    )
+            # Extract unique speakers
+            speakers = sorted(
+                set(
+                    seg.get("speaker", "UNKNOWN")
+                    for seg in result.get("segments", [])
+                    if seg.get("speaker")
+                )
+            )
+        except Exception as e:
+            logger.error(f"Diarization failed: {e}")
+            logger.warning("Continuing without speaker labels")
+    else:
+        logger.info("Diarization disabled, skipping speaker assignment")
 
     # Format segments for output
     segments = _format_segments(result.get("segments", []))
