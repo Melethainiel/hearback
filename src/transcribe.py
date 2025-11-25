@@ -123,13 +123,20 @@ def transcribe_audio(
 
     # Transcribe
     logger.info("Running transcription")
+    logger.info(f"Audio shape: {audio.shape}, duration: {duration:.2f}s")
     transcribe_options = {"batch_size": 8}  # Reduced for stability
     if language and language != "auto":
         transcribe_options["language"] = language
 
+    logger.info(f"Calling whisper_model.transcribe with options: {transcribe_options}")
     result = whisper_model.transcribe(audio, **transcribe_options)
+    logger.info("Whisper transcription completed successfully")
+
     detected_language = result.get(
         "language", language if language != "auto" else "unknown"
+    )
+    logger.info(
+        f"Detected language: {detected_language}, segments: {len(result.get('segments', []))}"
     )
 
     # Align whisper output (optional for word-level timestamps)
