@@ -11,13 +11,15 @@ from typing import Any
 try:
     import nvidia.cudnn
 
-    cudnn_path = os.path.join(os.path.dirname(nvidia.cudnn.__file__), "lib")
-    if os.path.exists(cudnn_path):
-        os.environ["LD_LIBRARY_PATH"] = (
-            f"{cudnn_path}:{os.environ.get('LD_LIBRARY_PATH', '')}"
-        )
-        logging.info(f"Set LD_LIBRARY_PATH to use cuDNN from: {cudnn_path}")
-except ImportError:
+    if hasattr(nvidia.cudnn, "__file__") and nvidia.cudnn.__file__:
+        cudnn_path = os.path.join(os.path.dirname(nvidia.cudnn.__file__), "lib")
+        if os.path.exists(cudnn_path):
+            os.environ["LD_LIBRARY_PATH"] = (
+                f"{cudnn_path}:{os.environ.get('LD_LIBRARY_PATH', '')}"
+            )
+            logging.basicConfig(level=logging.INFO)
+            logging.info(f"Set LD_LIBRARY_PATH to use cuDNN from: {cudnn_path}")
+except (ImportError, AttributeError, TypeError):
     pass
 
 import runpod
