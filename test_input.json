@@ -1,0 +1,9 @@
+{
+  "input": {
+    "audio_url": "https://example.com/audio.mp3",
+    "language": "fr",
+    "min_speakers": 2,
+    "max_speakers": 4,
+    "output_format": "json"
+  }
+}
