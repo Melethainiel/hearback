@@ -11,16 +11,29 @@ from typing import Any
 try:
     import nvidia.cudnn
 
+    # Try to find cudnn lib path - nvidia.cudnn.__file__ can be None
+    cudnn_path = None
     if hasattr(nvidia.cudnn, "__file__") and nvidia.cudnn.__file__:
         cudnn_path = os.path.join(os.path.dirname(nvidia.cudnn.__file__), "lib")
-        if os.path.exists(cudnn_path):
-            os.environ["LD_LIBRARY_PATH"] = (
-                f"{cudnn_path}:{os.environ.get('LD_LIBRARY_PATH', '')}"
-            )
-            logging.basicConfig(level=logging.INFO)
-            logging.info(f"Set LD_LIBRARY_PATH to use cuDNN from: {cudnn_path}")
-except (ImportError, AttributeError, TypeError):
-    pass
+    else:
+        # Fallback: search in site-packages
+        import site
+
+        for site_pkg in site.getsitepackages():
+            potential_path = os.path.join(site_pkg, "nvidia", "cudnn", "lib")
+            if os.path.exists(potential_path):
+                cudnn_path = potential_path
+                break
+
+    if cudnn_path and os.path.exists(cudnn_path):
+        os.environ["LD_LIBRARY_PATH"] = (
+            f"{cudnn_path}:{os.environ.get('LD_LIBRARY_PATH', '')}"
+        )
+        logging.basicConfig(level=logging.INFO)
+        logging.info(f"Set LD_LIBRARY_PATH to use cuDNN from: {cudnn_path}")
+except (ImportError, AttributeError, TypeError) as e:
+    logging.basicConfig(level=logging.INFO)
+    logging.warning(f"Could not configure cuDNN path: {e}")
 
 import runpod
 
