@@ -6,6 +6,7 @@ from typing import Any
 
 import torch
 import whisperx
+from whisperx.diarize import DiarizationPipeline
 
 logger = logging.getLogger(__name__)
 
@@ -56,7 +57,7 @@ def load_models(device: str | None = None, compute_type: str | None = None) -> N
             )
 
         logger.info("Loading diarization pipeline")
-        _model_cache["diarize"] = whisperx.DiarizationPipeline(
+        _model_cache["diarize"] = DiarizationPipeline(
             use_auth_token=hf_token,
             device=device,
         )
