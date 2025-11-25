@@ -1,8 +1,24 @@
 """RunPod serverless handler for audio transcription."""
 
 import logging
+import os
+import sys
 import time
 from typing import Any
+
+# Fix cuDNN 9.x incompatibility by forcing cuDNN 8.x from pip
+# See: https://github.com/m-bain/whisperX/issues/902#issuecomment-2433187969
+try:
+    import nvidia.cudnn
+
+    cudnn_path = os.path.join(os.path.dirname(nvidia.cudnn.__file__), "lib")
+    if os.path.exists(cudnn_path):
+        os.environ["LD_LIBRARY_PATH"] = (
+            f"{cudnn_path}:{os.environ.get('LD_LIBRARY_PATH', '')}"
+        )
+        logging.info(f"Set LD_LIBRARY_PATH to use cuDNN from: {cudnn_path}")
+except ImportError:
+    pass
 
 import runpod
 
