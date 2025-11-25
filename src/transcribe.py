@@ -132,24 +132,31 @@ def transcribe_audio(
         "language", language if language != "auto" else "unknown"
     )
 
-    # Align whisper output
-    logger.info(f"Aligning transcription (language: {detected_language})")
-    align_model, align_metadata = whisperx.load_align_model(
-        language_code=detected_language,
-        device=device,
-    )
-    result = whisperx.align(
-        result["segments"],
-        align_model,
-        align_metadata,
-        audio,
-        device,
-        return_char_alignments=False,
-    )
+    # Align whisper output (optional for word-level timestamps)
+    try:
+        logger.info(f"Aligning transcription (language: {detected_language})")
+        align_model, align_metadata = whisperx.load_align_model(
+            language_code=detected_language,
+            device=device,
+        )
+        result = whisperx.align(
+            result["segments"],
+            align_model,
+            align_metadata,
+            audio,
+            device,
+            return_char_alignments=False,
+        )
+        logger.info("Alignment completed")
 
-    # Clean up align model to free memory
-    del align_model
-    torch.cuda.empty_cache() if device == "cuda" else None
+        # Clean up align model to free memory
+        del align_model
+        torch.cuda.empty_cache() if device == "cuda" else None
+    except Exception as e:
+        logger.error(f"Alignment failed: {e}")
+        logger.warning("Continuing without word-level alignment")
+        # Use original whisper segments without alignment
+        result = {"segments": result["segments"]}
 
     # Diarize (if available)
     speakers = []
