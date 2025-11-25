@@ -7,7 +7,7 @@ from typing import Any
 import runpod
 
 from transcribe import load_models, transcribe_audio
-from utils import cleanup_temp_files, download_audio, format_output
+from utils import cleanup_temp_files, convert_to_wav, download_audio, format_output
 
 # Configure logging
 logging.basicConfig(
@@ -83,6 +83,7 @@ def handler(job: dict[str, Any]) -> dict[str, Any] | str:
     """
     start_time = time.time()
     audio_path = None
+    wav_path = None
 
     try:
         # Validate input
@@ -96,9 +97,12 @@ def handler(job: dict[str, Any]) -> dict[str, Any] | str:
         audio_path = download_audio(validated["audio_url"])
         logger.info(f"Audio downloaded to {audio_path}")
 
+        # Convert to WAV for better compatibility
+        wav_path = convert_to_wav(audio_path)
+
         # Transcribe
         result = transcribe_audio(
-            audio_path=audio_path,
+            audio_path=wav_path,
             language=validated["language"],
             min_speakers=validated["min_speakers"],
             max_speakers=validated["max_speakers"],
@@ -127,8 +131,7 @@ def handler(job: dict[str, Any]) -> dict[str, Any] | str:
         return {"error": f"Transcription failed: {str(e)}"}
     finally:
         # Cleanup temp files
-        if audio_path:
-            cleanup_temp_files(audio_path)
+        cleanup_temp_files(audio_path, wav_path)
 
 
 # Pre-load models on cold start

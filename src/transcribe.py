@@ -101,7 +101,7 @@ def transcribe_audio(
 
     # Transcribe
     logger.info("Running transcription")
-    transcribe_options = {"batch_size": 16}
+    transcribe_options = {"batch_size": 8}  # Reduced for stability
     if language and language != "auto":
         transcribe_options["language"] = language
 

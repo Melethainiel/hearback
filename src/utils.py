@@ -1,10 +1,14 @@
 """Utility functions for audio download, output formatting, and cleanup."""
 
+import logging
 import os
+import subprocess
 import tempfile
 from typing import Any
 
 import requests
+
+logger = logging.getLogger(__name__)
 
 
 def download_audio(url: str, timeout: int = 300) -> str:
@@ -44,6 +48,55 @@ def download_audio(url: str, timeout: int = 300) -> str:
         raise
 
     return temp_path
+
+
+def convert_to_wav(input_path: str) -> str:
+    """Convert audio file to WAV format using ffmpeg.
+
+    Args:
+        input_path: Path to the input audio file.
+
+    Returns:
+        Path to the converted WAV file.
+
+    Raises:
+        RuntimeError: If ffmpeg conversion fails.
+    """
+    fd, output_path = tempfile.mkstemp(suffix=".wav")
+    os.close(fd)
+
+    try:
+        cmd = [
+            "ffmpeg",
+            "-y",  # Overwrite output
+            "-i",
+            input_path,
+            "-ar",
+            "16000",  # 16kHz sample rate (whisperx expects this)
+            "-ac",
+            "1",  # Mono
+            "-c:a",
+            "pcm_s16le",  # 16-bit PCM
+            output_path,
+        ]
+        logger.info(f"Converting audio to WAV: {' '.join(cmd)}")
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=300,
+        )
+        if result.returncode != 0:
+            raise RuntimeError(f"ffmpeg conversion failed: {result.stderr}")
+
+        logger.info(f"Audio converted to {output_path}")
+        return output_path
+
+    except Exception:
+        # Clean up on failure
+        if os.path.exists(output_path):
+            os.unlink(output_path)
+        raise
 
 
 def _get_extension_from_content_type(content_type: str) -> str:
@@ -173,11 +226,11 @@ def _format_vtt(segments: list[dict[str, Any]]) -> str:
     return "\n".join(lines)
 
 
-def cleanup_temp_files(*paths: str) -> None:
+def cleanup_temp_files(*paths: str | None) -> None:
     """Remove temporary files, ignoring errors.
 
     Args:
-        paths: File paths to remove.
+        paths: File paths to remove (None values are ignored).
     """
     for path in paths:
         try:
