@@ -166,22 +166,30 @@ def transcribe_audio(
     logger.info(f"Device: {device}, Compute type: {compute_type}")
     log_system_stats()  # Check resources before GPU inference
 
+    # Reduce batch size further for long audio to prevent segfaults
+    # Empirical: audio > 180s needs smaller batch
+    if duration > 180:
+        batch_size = 4
+        logger.warning(
+            f"Long audio ({duration:.0f}s), reducing batch_size to {batch_size}"
+        )
+    else:
+        batch_size = 8
+
     transcribe_options = {
-        "batch_size": 8,  # Reduced to prevent GPU OOM/segfaults
+        "batch_size": batch_size,
+        # Don't pass language here - it was already passed to load_model()
     }
-    # Language was already passed to load_model, don't pass it again to transcribe
-    # if language and language != "auto":
-    #     transcribe_options["language"] = language
-    #     logger.info(f"Language '{language}' will be passed to WhisperX transcribe()")
-    # else:
-    #     logger.warning(
-    #         f"No language specified (got: {language}), WhisperX will auto-detect"
-    #     )
 
     logger.info(f"Calling whisper_model.transcribe with options: {transcribe_options}")
     logger.info(
         "Starting Whisper inference on GPU (VAD handled by Whisper internally)..."
     )
+
+    # Force GPU cleanup before transcription
+    if device == "cuda":
+        torch.cuda.empty_cache()
+        gc.collect()
 
     # Wrap transcription in try-catch with explicit GPU cleanup
     try:
