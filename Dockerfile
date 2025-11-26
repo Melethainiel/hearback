@@ -1,4 +1,4 @@
-FROM runpod/pytorch:1.0.2-cu1290-torch271-ubuntu2204
+FROM runpod/pytorch:1.0.2-cu1290-torch280-ubuntu2204
 
 # Set working directory
 WORKDIR /app
