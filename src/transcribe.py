@@ -128,6 +128,7 @@ def transcribe_audio(
             - language: Detected or specified language
             - duration: Audio duration in seconds
     """
+    logger.info(f"transcribe_audio called with language='{language}'")
     device = get_device()
     compute_type = get_compute_type()
 
@@ -154,6 +155,11 @@ def transcribe_audio(
     }
     if language and language != "auto":
         transcribe_options["language"] = language
+        logger.info(f"Language '{language}' will be passed to WhisperX transcribe()")
+    else:
+        logger.warning(
+            f"No language specified (got: {language}), WhisperX will auto-detect"
+        )
 
     logger.info(f"Calling whisper_model.transcribe with options: {transcribe_options}")
     logger.info(
