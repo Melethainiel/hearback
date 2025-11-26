@@ -13,7 +13,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt .
 
 # Install Python dependencies (no need to reinstall PyTorch, it's already 2.5.1)
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt && \
+    pip list | grep -E "(runpod|torch|whisperx)" && \
+    python -c "import runpod; print('runpod OK')"
 
 # Copy source code
 COPY src/ ./
