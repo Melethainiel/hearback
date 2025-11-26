@@ -63,6 +63,7 @@ def load_models(
     device: str | None = None,
     compute_type: str | None = None,
     enable_diarization: bool = True,
+    language: str | None = None,  # Add language parameter
 ) -> None:
     """Pre-load models into cache for faster inference.
 
@@ -70,6 +71,7 @@ def load_models(
         device: Device to load models on ("cuda" or "cpu").
         compute_type: Compute type for faster-whisper ("float16", "int8", etc.).
         enable_diarization: Whether to load diarization model (default: True).
+        language: Language code to optimize model loading ("fr", "en", etc.).
     """
     device = device or get_device()
     compute_type = compute_type or get_compute_type()
@@ -78,13 +80,24 @@ def load_models(
     # Log system stats before loading models
     log_system_stats()
 
-    if "whisper" not in _model_cache:
+    # Use language-specific cache key if language is provided
+    cache_key = f"whisper_{language}" if language and language != "auto" else "whisper"
+
+    if cache_key not in _model_cache:
         logger.info(f"Loading Whisper model: {model_name} on {device}")
-        _model_cache["whisper"] = whisperx.load_model(
-            model_name,
-            device,
-            compute_type=compute_type,
-        )
+        load_kwargs = {
+            "whisper_arch": model_name,
+            "device": device,
+            "compute_type": compute_type,
+        }
+        # Pass language to skip VAD loading
+        if language and language != "auto":
+            load_kwargs["language"] = language
+            logger.info(
+                f"Loading model with language='{language}' to skip VAD initialization"
+            )
+
+        _model_cache[cache_key] = whisperx.load_model(**load_kwargs)
         logger.info("Whisper model loaded")
         log_system_stats()  # Log after model load
 
@@ -132,10 +145,12 @@ def transcribe_audio(
     device = get_device()
     compute_type = get_compute_type()
 
-    # Ensure models are loaded
-    load_models(device, compute_type)
+    # Ensure models are loaded with language parameter
+    load_models(device, compute_type, language=language)
 
-    whisper_model = _model_cache["whisper"]
+    # Use language-specific cache key
+    cache_key = f"whisper_{language}" if language and language != "auto" else "whisper"
+    whisper_model = _model_cache.get(cache_key) or _model_cache.get("whisper")
     diarize_pipeline = _model_cache.get("diarize")
 
     # Load audio
@@ -153,13 +168,14 @@ def transcribe_audio(
     transcribe_options = {
         "batch_size": 16,  # Optimal batch size for GPU utilization
     }
-    if language and language != "auto":
-        transcribe_options["language"] = language
-        logger.info(f"Language '{language}' will be passed to WhisperX transcribe()")
-    else:
-        logger.warning(
-            f"No language specified (got: {language}), WhisperX will auto-detect"
-        )
+    # Language was already passed to load_model, don't pass it again to transcribe
+    # if language and language != "auto":
+    #     transcribe_options["language"] = language
+    #     logger.info(f"Language '{language}' will be passed to WhisperX transcribe()")
+    # else:
+    #     logger.warning(
+    #         f"No language specified (got: {language}), WhisperX will auto-detect"
+    #     )
 
     logger.info(f"Calling whisper_model.transcribe with options: {transcribe_options}")
     logger.info(
