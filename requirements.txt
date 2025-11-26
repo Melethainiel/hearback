@@ -1,5 +1,7 @@
 runpod>=1.6.0
-# PyTorch is provided by base image (2.5.1)
+torch==2.8.0
+torchaudio==2.8.0
+torchvision==0.23.0
 whisperx @ git+https://github.com/m-bain/whisperx.git
 faster-whisper>=0.10.0
 pyannote.audio>=3.1.0
