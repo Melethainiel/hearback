@@ -151,7 +151,6 @@ def transcribe_audio(
 
     transcribe_options = {
         "batch_size": 16,  # Optimal batch size for GPU utilization
-        "without_timestamps": False,  # We need timestamps
     }
     if language and language != "auto":
         transcribe_options["language"] = language
