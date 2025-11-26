@@ -140,11 +140,13 @@ def handler(job: dict[str, Any]) -> dict[str, Any] | str:
             logger.info("GPU cache cleared")
 
 
-# Pre-load models on cold start
+# Pre-load models on cold start with default language to skip VAD
 logger.info("Pre-loading models...")
 try:
-    load_models()
-    logger.info("Models pre-loaded successfully")
+    # Pre-load with "fr" to avoid VAD overhead (most common use case)
+    # The model can still handle other languages at runtime
+    load_models(language="fr")
+    logger.info("Models pre-loaded successfully with language='fr'")
 except Exception as e:
     logger.error(f"Failed to pre-load models: {e}")
 
