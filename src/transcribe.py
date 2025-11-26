@@ -80,12 +80,10 @@ def load_models(
 
     if "whisper" not in _model_cache:
         logger.info(f"Loading Whisper model: {model_name} on {device}")
-        logger.info("Loading without VAD filter for better GPU performance...")
         _model_cache["whisper"] = whisperx.load_model(
             model_name,
             device,
             compute_type=compute_type,
-            vad_filter=False,  # Disable VAD to prevent CPU bottleneck
         )
         logger.info("Whisper model loaded")
         log_system_stats()  # Log after model load
@@ -153,12 +151,15 @@ def transcribe_audio(
 
     transcribe_options = {
         "batch_size": 16,  # Optimal batch size for GPU utilization
+        "without_timestamps": False,  # We need timestamps
     }
     if language and language != "auto":
         transcribe_options["language"] = language
 
     logger.info(f"Calling whisper_model.transcribe with options: {transcribe_options}")
-    logger.info("Starting Whisper inference on GPU...")
+    logger.info(
+        "Starting Whisper inference on GPU (VAD handled by Whisper internally)..."
+    )
     result = whisper_model.transcribe(audio, **transcribe_options)
     logger.info(
         f"Whisper transcription completed successfully - got {len(result.get('segments', []))} segments"
