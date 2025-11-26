@@ -4,6 +4,7 @@ import logging
 import time
 from typing import Any
 
+import torch
 import runpod
 
 from transcribe import load_models, transcribe_audio
@@ -132,6 +133,11 @@ def handler(job: dict[str, Any]) -> dict[str, Any] | str:
     finally:
         # Cleanup temp files
         cleanup_temp_files(audio_path, wav_path)
+
+        # Clear GPU cache to prevent memory accumulation
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            logger.info("GPU cache cleared")
 
 
 # Pre-load models on cold start

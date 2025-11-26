@@ -2,6 +2,7 @@
 
 import logging
 import os
+import shutil
 from typing import Any
 
 import torch
@@ -17,6 +18,35 @@ _model_cache: dict[str, Any] = {}
 def get_device() -> str:
     """Get the best available device."""
     return "cuda" if torch.cuda.is_available() else "cpu"
+
+
+def log_system_stats() -> None:
+    """Log system resource statistics."""
+    # Disk space
+    disk = shutil.disk_usage("/")
+    disk_free_gb = disk.free / (1024**3)
+    disk_total_gb = disk.total / (1024**3)
+    disk_used_percent = (disk.used / disk.total) * 100
+    logger.info(
+        f"Disk: {disk_free_gb:.2f}GB free / {disk_total_gb:.2f}GB total ({disk_used_percent:.1f}% used)"
+    )
+
+    # GPU memory
+    if torch.cuda.is_available():
+        gpu_mem_allocated = torch.cuda.memory_allocated() / (1024**3)
+        gpu_mem_reserved = torch.cuda.memory_reserved() / (1024**3)
+        gpu_total_mem = torch.cuda.get_device_properties(0).total_memory / (1024**3)
+        logger.info(
+            f"GPU Memory: {gpu_mem_allocated:.2f}GB allocated, {gpu_mem_reserved:.2f}GB reserved / {gpu_total_mem:.2f}GB total"
+        )
+
+    # /tmp space (important for temp files)
+    try:
+        tmp_disk = shutil.disk_usage("/tmp")
+        tmp_free_gb = tmp_disk.free / (1024**3)
+        logger.info(f"/tmp space: {tmp_free_gb:.2f}GB free")
+    except Exception as e:
+        logger.warning(f"Could not check /tmp space: {e}")
 
 
 def get_compute_type() -> str:
@@ -45,14 +75,20 @@ def load_models(
     compute_type = compute_type or get_compute_type()
     model_name = get_whisper_model_name()
 
+    # Log system stats before loading models
+    log_system_stats()
+
     if "whisper" not in _model_cache:
         logger.info(f"Loading Whisper model: {model_name} on {device}")
+        logger.info("Loading without VAD filter for better GPU performance...")
         _model_cache["whisper"] = whisperx.load_model(
             model_name,
             device,
             compute_type=compute_type,
+            vad_filter=False,  # Disable VAD to prevent CPU bottleneck
         )
         logger.info("Whisper model loaded")
+        log_system_stats()  # Log after model load
 
     if enable_diarization and "diarize" not in _model_cache:
         hf_token = os.environ.get("HF_TOKEN")
@@ -67,6 +103,7 @@ def load_models(
                 device=device,
             )
             logger.info("Diarization pipeline loaded")
+            log_system_stats()  # Log after diarization load
         except Exception as e:
             logger.error(f"Failed to load diarization pipeline: {e}")
             logger.warning("Continuing without diarization")
@@ -104,19 +141,29 @@ def transcribe_audio(
 
     # Load audio
     logger.info(f"Loading audio from {audio_path}")
+    log_system_stats()  # Check resources before processing
     audio = whisperx.load_audio(audio_path)
     duration = len(audio) / 16000  # whisperx uses 16kHz
 
     # Transcribe
     logger.info("Running transcription")
     logger.info(f"Audio shape: {audio.shape}, duration: {duration:.2f}s")
-    transcribe_options = {"batch_size": 8}  # Reduced for stability
+    logger.info(f"Device: {device}, Compute type: {compute_type}")
+    log_system_stats()  # Check resources before GPU inference
+
+    transcribe_options = {
+        "batch_size": 16,  # Optimal batch size for GPU utilization
+    }
     if language and language != "auto":
         transcribe_options["language"] = language
 
     logger.info(f"Calling whisper_model.transcribe with options: {transcribe_options}")
+    logger.info("Starting Whisper inference on GPU...")
     result = whisper_model.transcribe(audio, **transcribe_options)
-    logger.info("Whisper transcription completed successfully")
+    logger.info(
+        f"Whisper transcription completed successfully - got {len(result.get('segments', []))} segments"
+    )
+    log_system_stats()  # Check resources after transcription
 
     detected_language = result.get(
         "language", language if language != "auto" else "unknown"
@@ -145,6 +192,7 @@ def transcribe_audio(
         # Clean up align model to free memory
         del align_model
         torch.cuda.empty_cache() if device == "cuda" else None
+        log_system_stats()  # Check resources after alignment
     except Exception as e:
         logger.error(f"Alignment failed: {e}")
         logger.warning("Continuing without word-level alignment")
