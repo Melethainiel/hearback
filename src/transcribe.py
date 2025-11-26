@@ -1,5 +1,6 @@
 """WhisperX transcription logic with speaker diarization."""
 
+import gc
 import logging
 import os
 import shutil
@@ -166,7 +167,7 @@ def transcribe_audio(
     log_system_stats()  # Check resources before GPU inference
 
     transcribe_options = {
-        "batch_size": 16,  # Optimal batch size for GPU utilization
+        "batch_size": 8,  # Reduced to prevent GPU OOM/segfaults
     }
     # Language was already passed to load_model, don't pass it again to transcribe
     # if language and language != "auto":
@@ -181,10 +182,26 @@ def transcribe_audio(
     logger.info(
         "Starting Whisper inference on GPU (VAD handled by Whisper internally)..."
     )
-    result = whisper_model.transcribe(audio, **transcribe_options)
-    logger.info(
-        f"Whisper transcription completed successfully - got {len(result.get('segments', []))} segments"
-    )
+
+    # Wrap transcription in try-catch with explicit GPU cleanup
+    try:
+        result = whisper_model.transcribe(audio, **transcribe_options)
+        logger.info(
+            f"Whisper transcription completed successfully - got {len(result.get('segments', []))} segments"
+        )
+    except Exception as e:
+        logger.error(f"Whisper transcription failed: {e}")
+        # Force GPU cleanup on error
+        if device == "cuda":
+            torch.cuda.empty_cache()
+            gc.collect()
+        raise
+    finally:
+        # Always cleanup after transcription attempt
+        if device == "cuda":
+            torch.cuda.synchronize()  # Wait for GPU operations to complete
+            gc.collect()
+
     log_system_stats()  # Check resources after transcription
 
     detected_language = result.get(

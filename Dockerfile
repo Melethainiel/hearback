@@ -1,4 +1,4 @@
-FROM runpod/pytorch:1.0.2-cu1290-torch280-ubuntu2204
+FROM runpod/pytorch:0.7.0-cu1241-torch251-ubuntu2204
 
 # Set working directory
 WORKDIR /app
@@ -12,7 +12,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Copy requirements first for better caching
 COPY requirements.txt .
 
-# Install Python dependencies
+# Install Python dependencies (no need to reinstall PyTorch, it's already 2.5.1)
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy source code
