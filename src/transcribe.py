@@ -148,15 +148,13 @@ def transcribe_audio(
     logger.info(f"Device: {device}, Compute type: {compute_type}")
     log_system_stats()  # Check resources before GPU inference
 
-    # Reduce batch size further for long audio to prevent segfaults
-    # Empirical: audio > 180s needs smaller batch
-    if duration > 180:
-        batch_size = 4
-        logger.warning(
-            f"Long audio ({duration:.0f}s), reducing batch_size to {batch_size}"
-        )
-    else:
+    # Adjust batch size based on audio duration
+    # Larger batch = faster but more VRAM usage
+    if duration > 300:
         batch_size = 8
+        logger.info(f"Long audio ({duration:.0f}s), using batch_size={batch_size}")
+    else:
+        batch_size = 16
 
     transcribe_options = {
         "batch_size": batch_size,
