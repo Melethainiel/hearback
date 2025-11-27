@@ -25,7 +25,7 @@ ENV COMPUTE_TYPE=float16
 
 # Fix cuDNN path to avoid segfault issues
 # See: https://github.com/m-bain/whisperX/issues/902
-ENV LD_LIBRARY_PATH=/usr/local/lib/python3.11/site-packages/nvidia/cudnn/lib:${LD_LIBRARY_PATH}
+ENV LD_LIBRARY_PATH=/usr/local/lib/python3.12/dist-packages/nvidia/cudnn/lib:${LD_LIBRARY_PATH}
 
 # Run the handler
 CMD ["python", "-u", "handler.py"]
